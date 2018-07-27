@@ -3,14 +3,16 @@ using System;
 using Kill_1.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Kill_1.Migrations
 {
     [DbContext(typeof(KillDbContext))]
-    partial class KillDbContextModelSnapshot : ModelSnapshot
+    [Migration("20180727143016_AddStockRowVersion")]
+    partial class AddStockRowVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -19,6 +19,7 @@ namespace Kill_1.Data
             modelBuilder.Entity<Order>().HasKey(x => x.Id);
             modelBuilder.Entity<Order>().Property(x => x.CreatedTime).ValueGeneratedOnAdd();
             modelBuilder.Entity<Order>().Property(x => x.Name).HasMaxLength(32).IsRequired();
+            modelBuilder.Entity<Stock>().Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
             base.OnModelCreating(modelBuilder);
         }
     }

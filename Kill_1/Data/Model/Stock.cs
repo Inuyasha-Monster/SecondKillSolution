@@ -1,4 +1,7 @@
-﻿namespace Kill_1.Data.Model
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace Kill_1.Data.Model
 {
     public class Stock
     {
@@ -6,5 +9,7 @@
         public string Name { get; set; }
         public int Count { get; set; }
         public int Sale { get; set; }
+        [Timestamp]
+        public DateTime RowVersion { get; set; }
     }
 }

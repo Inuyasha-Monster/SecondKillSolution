@@ -22,10 +22,9 @@ namespace Kill_1.Service
 
         public int CreateOrder(int stockId)
         {
-            // 参数进程内限流(ConcurrentDictionary实现且不带清楚历史限流记录功能)
-            //RateLimite();
+            //RateLimit();
 
-            RateLimit(10, 5);
+            RateLimit(60, 3);
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
@@ -65,17 +64,15 @@ namespace Kill_1.Service
         {
             string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
-            if (TimeDic.TryGetValue(timeStr, out int num))
+            // 原子操作抗并发
+            TimeDic.AddOrUpdate(timeStr, 1, (x, y) => ++y);
+
+            if (TimeDic.TryGetValue(timeStr, out var num))
             {
                 if (num > 2)
                 {
                     throw new RateLimiteException($"1s内只允许2次请求,您的请求超出范围 key:{timeStr} value:{num}");
                 }
-                TimeDic[timeStr]++;
-            }
-            else
-            {
-                TimeDic.TryAdd(timeStr, 1);
             }
         }
 
@@ -93,18 +90,18 @@ namespace Kill_1.Service
             {
                 var last = TimeCustomerDic.Last();
                 var timeSpan = now - DateTime.Parse(last.Key);
-                if (timeSpan.Seconds > 180)
+                if (timeSpan.Seconds > second)
                 {
                     string timeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
                     TimeCustomerDic.AddOrUpdate(timeStr, 1, (x, y) => ++y);
                 }
                 else
                 {
-                    TimeCustomerDic[last.Key]++;
+                    TimeCustomerDic.AddOrUpdate(last.Key, 1, (x, y) => ++y);
 
-                    if (TimeCustomerDic[last.Key] > 3)
+                    if (TimeCustomerDic[last.Key] > limitNum)
                     {
-                        throw new RateLimiteException($"180s内只允许3次请求,您的请求超出范围 key:{last.Key} value:{TimeCustomerDic[last.Key]}");
+                        throw new RateLimiteException($"{second}s内只允许{limitNum}次请求,您的请求超出范围 key:{last.Key} value:{TimeCustomerDic[last.Key]}");
                     }
 
                 }

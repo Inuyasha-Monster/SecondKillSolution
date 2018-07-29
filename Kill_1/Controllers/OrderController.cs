@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Kill_1.Common;
 using Kill_1.Service;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,10 @@ namespace Kill_1.Controllers
             catch (ArgumentException e)
             {
                 return BadRequest($"参数错误:{e}");
+            }
+            catch (RateLimiteException e)
+            {
+                return BadRequest($"限流错误:{e}");
             }
             catch (Exception e)
             {

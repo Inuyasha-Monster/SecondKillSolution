@@ -23,7 +23,9 @@ namespace Kill_1.Service
         public int CreateOrder(int stockId)
         {
             // 参数进程内限流(ConcurrentDictionary实现且不带清楚历史限流记录功能)
-            RateLimite();
+            //RateLimite();
+
+            RateLimit(10, 5);
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
@@ -54,10 +56,12 @@ namespace Kill_1.Service
 
         private static readonly ConcurrentDictionary<string, int> TimeDic = new ConcurrentDictionary<string, int>();
 
+        private static readonly ConcurrentDictionary<string, int> TimeCustomerDic = new ConcurrentDictionary<string, int>();
+
         /// <summary>
         /// 设置为1s中只能给2次请求,进程级别的限流
         /// </summary>
-        private static void RateLimite()
+        private static void RateLimit()
         {
             string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
@@ -82,7 +86,34 @@ namespace Kill_1.Service
         /// <param name="limitNum">次数</param>
         private static void RateLimit(int second, int limitNum)
         {
+            // 例如10s钟之内只能允许5次请求
 
+            var now = DateTime.Now;
+            if (TimeCustomerDic.Any())
+            {
+                var last = TimeCustomerDic.Last();
+                var timeSpan = now - DateTime.Parse(last.Key);
+                if (timeSpan.Seconds > 180)
+                {
+                    string timeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
+                    TimeCustomerDic.AddOrUpdate(timeStr, 1, (x, y) => ++y);
+                }
+                else
+                {
+                    TimeCustomerDic[last.Key]++;
+
+                    if (TimeCustomerDic[last.Key] > 3)
+                    {
+                        throw new RateLimiteException($"180s内只允许3次请求,您的请求超出范围 key:{last.Key} value:{TimeCustomerDic[last.Key]}");
+                    }
+
+                }
+            }
+            else
+            {
+                string timeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
+                TimeCustomerDic.AddOrUpdate(timeStr, 1, (x, y) => ++y);
+            }
         }
     }
 }

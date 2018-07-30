@@ -33,6 +33,7 @@ namespace Kill_1
             services.AddDbContext<KillDbContext>(x => x.UseMySql("server=localhost;port=3306;userid=root;password=111111;database=kill;",
                 y => y.MigrationsAssembly(typeof(Startup).Assembly.GetName().Name)));
             services.AddScoped<IOrderService, OrderService>();
+            ThreadPool.SetMinThreads(300, 300);
             var connect = ConnectionMultiplexer.Connect("139.199.221.46:6379");
             services.AddSingleton<IConnectionMultiplexer>(connect);
         }

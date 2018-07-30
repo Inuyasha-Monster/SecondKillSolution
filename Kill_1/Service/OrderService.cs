@@ -24,7 +24,7 @@ namespace Kill_1.Service
         {
             //RateLimit();
 
-            RateLimit(60, 3);
+            //RateLimit(60, 3);
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
@@ -112,5 +112,7 @@ namespace Kill_1.Service
                 TimeCustomerDic.AddOrUpdate(timeStr, 1, (x, y) => ++y);
             }
         }
+
+
     }
 }

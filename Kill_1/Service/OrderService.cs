@@ -5,19 +5,22 @@ using System.Linq;
 using System.Net.Sockets;
 using Kill_1.Common;
 using Kill_1.Data;
-using Kill_1.Data.Model;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using StackExchange.Redis;
+using Order = Kill_1.Data.Model.Order;
 
 namespace Kill_1.Service
 {
     public class OrderService : IOrderService
     {
         private readonly KillDbContext _dbContext;
+        private readonly IConnectionMultiplexer _connection;
 
-        public OrderService(KillDbContext dbContext)
+        public OrderService(KillDbContext dbContext, IConnectionMultiplexer connection)
         {
             _dbContext = dbContext;
+            _connection = connection;
         }
 
         public int CreateOrder(int stockId)
@@ -28,7 +31,10 @@ namespace Kill_1.Service
 
             // 有锁模式
             //RateLimitWithLock();
-            RateLimitWithLock(10, 5);
+            //RateLimitWithLock(10, 5);
+
+            // redis lua 分布式限流:利用lua脚本在单线程的redis的原子操作特性
+            RateLimitWithRedisLuaScript();
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
@@ -174,6 +180,34 @@ namespace Kill_1.Service
                     string timeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
                     TimeSpanDictionary.TryAdd(timeStr, 1);
                 }
+            }
+        }
+
+        private void RateLimitWithRedisLuaScript()
+        {
+            var database = _connection.GetDatabase();
+            string lua = @"
+                            --lua 下标从 1 开始
+                            -- 限流 key
+                            local key = KEYS[1]
+                            -- 限流大小
+                            local limit = tonumber(ARGV[1])
+                            -- 获取当前流量大小
+                            local curentLimit = tonumber(redis.call('get', key) or '0')
+                            if curentLimit + 1 > limit then
+                                -- 达到限流大小 返回
+                                return 0;
+                            else
+                                --没有达到阈值 value + 1
+                                redis.call('INCRBY', key, 1)
+                                --重置key的失效时间
+                                redis.call('EXPIRE', key, 10)
+                                return curentLimit + 1
+                            end";
+            var redisResult = database.ScriptEvaluate(lua, new RedisKey[] { DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }, new RedisValue[] { 2 });
+            if (redisResult.ToString() == "0")
+            {
+                throw new RateLimiteException("redis限流超过预期范围");
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Kill_1.Data;
 using Kill_1.Service;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 namespace Kill_1
 {
@@ -31,6 +33,8 @@ namespace Kill_1
             services.AddDbContext<KillDbContext>(x => x.UseMySql("server=localhost;port=3306;userid=root;password=111111;database=kill;",
                 y => y.MigrationsAssembly(typeof(Startup).Assembly.GetName().Name)));
             services.AddScoped<IOrderService, OrderService>();
+            var connect = ConnectionMultiplexer.Connect("139.199.221.46:6379");
+            services.AddSingleton<IConnectionMultiplexer>(connect);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

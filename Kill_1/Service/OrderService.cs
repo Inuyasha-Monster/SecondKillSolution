@@ -22,9 +22,13 @@ namespace Kill_1.Service
 
         public int CreateOrder(int stockId)
         {
+            // 无锁模式
             //RateLimit();
-
             //RateLimit(60, 3);
+
+            // 有锁模式
+            //RateLimitWithLock();
+            RateLimitWithLock(10, 5);
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
@@ -113,6 +117,64 @@ namespace Kill_1.Service
             }
         }
 
+        // lock
+        private static readonly object Obj = new object();
 
+        // lock锁的模式 1s2次
+        private static readonly Dictionary<string, int> TimeDictionary = new Dictionary<string, int>();
+        private static void RateLimitWithLock()
+        {
+            lock (Obj)
+            {
+                string timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                if (TimeDictionary.TryGetValue(timeStr, out var num))
+                {
+                    if (num++ > 2)
+                    {
+                        throw new RateLimiteException($"1s内只允许2次请求,您的请求超出范围 key:{timeStr} value:{num}");
+                    }
+                    TimeDictionary[timeStr]++;
+                }
+                else
+                {
+                    TimeDictionary.TryAdd(timeStr, 1);
+                }
+            }
+        }
+
+        // lock锁的模式 {second}s{limitNum}次
+        private static readonly Dictionary<string, int> TimeSpanDictionary = new Dictionary<string, int>();
+        private static void RateLimitWithLock(int second, int limitNum)
+        {
+            lock (Obj)
+            {
+                var now = DateTime.Now;
+                if (TimeSpanDictionary.Any())
+                {
+                    var last = TimeSpanDictionary.Last();
+                    var timeSpan = now - DateTime.Parse(last.Key);
+                    if (timeSpan.Seconds > second)
+                    {
+                        string timeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
+                        TimeSpanDictionary.TryAdd(timeStr, 1);
+                    }
+                    else
+                    {
+                        TimeSpanDictionary[last.Key]++;
+
+                        if (TimeSpanDictionary[last.Key] > limitNum)
+                        {
+                            throw new RateLimiteException($"{second}s内只允许{limitNum}次请求,您的请求超出范围 key:{last.Key} value:{TimeSpanDictionary[last.Key]}");
+                        }
+
+                    }
+                }
+                else
+                {
+                    string timeStr = now.ToString("yyyy-MM-dd HH:mm:ss");
+                    TimeSpanDictionary.TryAdd(timeStr, 1);
+                }
+            }
+        }
     }
 }

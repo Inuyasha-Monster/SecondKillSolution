@@ -35,7 +35,8 @@ namespace Kill_1.Service
             //RateLimitWithLock(10, 5);
 
             // redis lua 分布式限流:利用lua脚本在单线程的redis的原子操作特性
-            RateLimitWithRedisLuaScript();
+            //RateLimitWithRedisLuaScript();
+            RateLimitWithRedisLuaScriptByTimeWindow(nameof(CreateOrder), 10, 10);
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
@@ -213,17 +214,43 @@ namespace Kill_1.Service
                                 return curentLimit + 1
                             end";
             var redisResult = database.ScriptEvaluate(lua,
-                new RedisKey[] {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}, new RedisValue[] {2});
+                new RedisKey[] { DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") }, new RedisValue[] { 2 });
             if (redisResult.ToString() == "0")
             {
                 throw new RateLimiteException("redis限流超过预期范围");
             }
         }
 
-        private void RateLimitWithRedisLuaScriptByTimeWindow()
+        private void RateLimitWithRedisLuaScriptByTimeWindow(string key, int limit, int second)
         {
-
+            // todo:参数检查
+            var database = _connection.GetDatabase();
+            string lua = @"
+                            --lua 下标从 1 开始
+                            -- 限流 key 指定特定环境例如作用于某个web接口
+                            local key = KEYS[1]
+                            -- 限流大小 例如5次请求
+                            local limit = tonumber(ARGV[1])
+                            --- 时间窗口大小 例如10s
+                            local window = tonumber(ARGV[2])
+                            -- 获取当前流量大小
+                            local curentLimit = tonumber(redis.call('get', key) or '0')
+                            if curentLimit + 1 > limit then
+                                -- 达到限流大小 返回false
+                                return 0;
+                            else
+                                --没有达到阈值 value + 1
+                                redis.call('INCRBY', key, 1)
+                                if window > -1 then
+                                    redis.call('expire', key,window)
+                                end
+                                return curentLimit + 1
+                            end";
+            var redisResult = database.ScriptEvaluate(lua, new RedisKey[] { key }, new RedisValue[] { limit, second });
+            if (redisResult.ToString() == "0")
+            {
+                throw new RateLimiteException($"redis限流超过预期范围:{second}s内只允许{limit}次请求, key={key},limit={limit},time={second}");
+            }
         }
-
     }
 }

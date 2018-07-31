@@ -36,7 +36,7 @@ namespace Kill_1.Service
 
             // redis lua 分布式限流:利用lua脚本在单线程的redis的原子操作特性
             //RateLimitWithRedisLuaScript();
-            RateLimitWithRedisLuaScriptByTimeWindow(nameof(CreateOrder), 10, 10);
+            RateLimitWithRedisLuaScriptByTimeWindow(nameof(CreateOrder), 10, 10); // 表示10s内只允许10次请求而且是分布式的限流
 
             var stock = _dbContext.Stocks.FirstOrDefault(x => x.Id == stockId);
             if (stock == null)
